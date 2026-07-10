@@ -1,0 +1,45 @@
+# 日报/周报系统配置
+# 复制为 config.yaml 并修改为你的实际路径
+# ====================
+
+# 项目工作目录（JSONL 中 cwd 字段） → 对外显示名称
+projects:
+  "E:\\your-project\\your-repo": "你的项目名"
+  # 示例：
+  # "E:\\<REDACTED>\\<PROJECT_A>-agent": "<PROJECT_A>-agent"
+
+# 内部术语 → 对外表述（先精确匹配，再正则匹配）
+term_replacements:
+  "\\bAC\\b": "交叉验证"
+  "\\bARC\\b": "架构设计"
+  "\\bslug\\b": "项目文档目录"
+  "搭建 slug": "建立项目文档目录结构"
+  # 添加你自己的术语：
+  # "<TOOL_A>": "岗位机器人"
+
+# 智能过滤阈值
+filter:
+  min_session_duration_minutes: 5
+  min_tool_calls: 3
+  ignore_pure_chat: true
+
+# <CALENDAR_PLATFORM>日程过滤（标题含以下任一关键词的日程忽略，大小写不敏感）
+calendar_keyword_blacklist:
+  - "午饭"
+  - "午休"
+  - "通勤"
+  - "sports and relaxed"
+  - "released and prepared"
+  - "physiotherapy"
+
+# 周报聚合策略
+weekly:
+  use_daily_reports_first: true
+  fallback_to_session_scan: true
+  week_start_day: "monday"    # 周报起始日（monday ~ sunday），默认 monday（周一~周日）
+                              # 周四开周会写周报的：用 "thursday"（上周四~本周三）
+
+# 数据源路径（Claude Code session 存储位置）
+data_sources:
+  claude_session_base: "C:/Users/<你的用户名>/.claude/projects"
+  project_prefix: "E--<REDACTED>-"

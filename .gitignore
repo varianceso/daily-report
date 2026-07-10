@@ -1,0 +1,17 @@
+# 日报/周报存档
+reports/
+
+# 个人配置（从 config.example.yaml 复制并修改）
+config.yaml
+
+# AI Agent 工作目录（避免 agent 生成产物提交到仓库）
+.claude/
+.zcode/
+.trae/
+.codex/
+.opencode/
+.cursor/
+.windsurf/
+
+# 开发过程产物
+.superpowers/

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "daily-report-marketplace",
+  "description": "Daily/weekly report generation plugin — extracts work content from AI coding assistant session records and generates standard reports.",
+  "owner": {
+    "name": "varianceso",
+    "email": "15603454+varianceso@users.noreply.github.com"
+  },
+  "plugins": [
+    {
+      "name": "daily-report",
+      "source": ".",
+      "description": "Generate daily and weekly reports from Claude/Codex session records + git commits + calendar. Supports --d/--fs/--w parameters.",
+      "version": "1.0.0",
+      "category": "productivity",
+      "tags": [
+        "report",
+        "daily-report",
+        "weekly-report",
+        "drpt",
+        "日报",
+        "周报"
+      ]
+    }
+  ]
+}
