@@ -37,9 +37,9 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
 
 根据 `week_start_day` 确定目标周范围（如 `thursday` → 上周四~本周三），只处理已过去的日期。
 
-每天：**优先**读 `../../reports/{YYYY-MM}/{YYYY-MM-DD}.md` 解析"今日完成" → **缺失则兜底**执行 session 扫描（同 daily-report 流程）。
+每天：**优先**读 `../../reports/{YYYY-MM}/{YYYY-MM-DD}.md` 解析"今日完成" → **缺失则兜底**执行 session 扫描（同 daily-report 流程，Claude + Codex 双数据源并行采集）。
 
-> `📊 数据来源: X 天来自日报文件，Y 天来自 session 扫描`
+> `📊 数据来源: X 天来自日报文件，Y 天来自 session 扫描（含 Claude/Codex）`
 
 ### 4. 聚合分析（六大板块）
 
@@ -58,7 +58,7 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
 **4.4 项目进展（核心）：**
 
 聚合逻辑：
-1. **按分支拆分为独立项目**：不同 gitBranch 的 session 必须分成独立项目标题，不合并
+1. **按分支拆分为独立项目**：不同 gitBranch 的 session 必须分成独立项目标题，不合并（Codex session 无 gitBranch → 按任务关键词 + 项目归属区分）
    - `feature/625-org-standard-management` → "组织架构规范化管理"
    - `feature/org-architecture-diagram` → "组织架构调整闭环-新增组织架构图能力"
    - `feature/701-job-management` → "岗位管理基建"

@@ -39,7 +39,10 @@ weekly:
   week_start_day: "monday"    # 周报起始日（monday ~ sunday），默认 monday（周一~周日）
                               # 周四开周会写周报的：用 "thursday"（上周四~本周三）
 
-# 数据源路径（Claude Code session 存储位置）
+# 数据源路径
+#   claude_session_base: Claude Code session 存储根目录
+#   codex_session_base:   Codex session（rollout JSONL）存储目录（可选，macOS/Linux ~/.codex/sessions）
 data_sources:
   claude_session_base: "C:/Users/<你的用户名>/.claude/projects"
+  codex_session_base: "~/.codex/sessions"
   project_prefix: "E--<REDACTED>-"

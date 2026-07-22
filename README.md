@@ -46,6 +46,34 @@
 
 同样支持 `/plugin install` 命令（后续适配阶段将实现各自的数据源适配器）。
 
+### Codex
+
+```bash
+# 添加插件市场
+codex plugin marketplace add https://github.com/varianceso/daily-report.git
+
+# 安装插件
+codex plugin add daily-report@daily-report-marketplace
+```
+
+或手动配置 `~/.codex/settings.json`：
+
+```json
+{
+  "pluginMarketplaces": [
+    {
+      "source": "git",
+      "url": "https://github.com/varianceso/daily-report.git"
+    }
+  ],
+  "enabledPlugins": {
+    "daily-report@daily-report-marketplace": true
+  }
+}
+```
+
+> **注意**：Codex 安装后需在 config.yaml 中配置 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）才能自动读取 Codex session 数据。
+
 ## 初次配置
 
 首次运行 `/daily-report` 或 `/weekly-report` 时，会自动进入交互式配置引导：
@@ -113,6 +141,7 @@ data_sources:
 | `weekly.week_start_day` | 否 | 周报起始日（monday~sunday），默认 monday |
 | `calendar_keyword_blacklist` | 否 | 日程标题含这些词则忽略 |
 | `data_sources.claude_session_base` | ✅ | Claude Code session JSONL 存储根目录 |
+| `data_sources.codex_session_base` | 否 | Codex rollout JSONL 存储目录（默认 `~/.codex/sessions`），配置后才启用 Codex 数据源 |
 | `data_sources.project_prefix` | ✅ | session 目录名前缀，用于扫描时过滤 |
 
 ## 使用
@@ -173,7 +202,7 @@ daily-report/
 | 阶段 | 内容 |
 |------|------|
 | Phase 1 ✅ | Claude 数据源 + 日报/周报 |
-| Phase 2 🔲 | Codex 数据源适配器 |
+| Phase 2 ✅ | Codex 数据源适配器 |
 | Phase 3 🔲 | OpenCode 数据源适配器 |
 | Phase 4 🔲 | ZCode 数据源适配器 |
 | Phase 5 🔲 | 多人配置模板 |

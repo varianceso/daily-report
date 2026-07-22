@@ -153,3 +153,64 @@
 | <CALENDAR_PLATFORM>写入失败 | 终端报错，本地存档不受影响 |
 | 周报某天缺日报 | 回退 session 扫描 |
 | session 解析异常 | 跳过并输出 warning |
+
+## 九、Codex Session 解析规则
+
+### 9.1 文件定位
+
+Codex session 以 JSONL 文件存储在 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）目录下，文件名格式为：
+
+```
+rollout-{YYYY-MM-DDTHH-MM-SS}-{uuid}.jsonl
+```
+
+例：`rollout-2025-05-07T17-24-21-5973b6c0-94b8-487b-a530-2aeb6098ae0e.jsonl`
+
+从文件名提取的时间戳（UTC）用于判断日期归属。
+
+### 9.2 JSONL 行结构
+
+每行是一个 JSON 事件，`type` 字段标识类型。以下是提取日报信息所需的类型映射：
+
+| Codex `type` | 提取字段 | 用途 |
+|-------------|----------|------|
+| `userMessage` | `content[].text` | 用户任务描述 |
+| `agentMessage` | `text` | AI 产出摘要 |
+| `commandExecution` | `command`, `cwd`, `status`, `exitCode` | 命令操作 + **cwd 项目归属** |
+| `fileChange` | `changes[].path`, `changes[].status` | 文件修改记录 |
+| `mcpToolCall` | `server`, `tool`, `arguments`, `result` | MCP 工具调用（含日历） |
+| `reasoning` | `summary[]`, `content[]` | AI 推理过程（可忽略） |
+| `webSearch` | `query` | 网络搜索（可忽略） |
+
+### 9.3 cwd 提取策略
+
+Codex session 无顶层 `cwd` 字段。项目归属通过以下策略确定：
+
+1. 收集所有 `commandExecution` 行中非空的 `cwd` 字段
+2. 取出现频率最高的 cwd 作为该 session 的主工作目录
+3. 归一化（`\`→`/`，小写，去末尾`/`）后匹配 config.yaml projects 映射
+4. 若全无 `commandExecution` 行（纯对话 session），标记为"无法识别项目"，归入"其他"
+
+### 9.4 等效 tool_calls 计算
+
+Codex 无 `tool_calls` 计数。过滤时计算等效值：
+
+```
+等效 tool_calls = count(commandExecution) + count(fileChange) + count(mcpToolCall)
+```
+
+丢弃等效值 < `filter.min_tool_calls` 的 session。
+
+### 9.5 gitBranch 缺失处理
+
+Codex session 无 `gitBranch` 字段。合并判断改为：
+
+- **同项目 + 任务关键词高度重叠** → 合并
+- **同项目 + 任务关键词明显不同** → 不合并
+
+### 9.6 与 Claude 的协同
+
+当同一天同时存在 Claude session 和 Codex session 时：
+- 两个数据源并⾏采集，合并后统一进入步骤 4（智能过滤）
+- 项目归并时按任务关键词判断，不按数据源区分
+- 归并说明中标注跨平台来源
