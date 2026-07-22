@@ -41,7 +41,11 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
 
 1. 提示用户：`⚙️ 检测到首次使用，需要配置以下内容：`
 
-2. **项目配置**：扫描 `data_sources.claude_session_base`（默认 `C:/Users/<用户名>/.claude/projects`）下所有项目的 JSONL，提取 cwd 去重列表。逐项询问：
+2. **项目配置**：扫描数据源下所有项目的 JSONL/rollout，提取 cwd 去重列表。
+   - **Claude**：扫描 `claude_session_base`（默认 `~/.claude/projects` 或 `C:/Users/<用户名>/.claude/projects`）下 `{project_prefix}*/**.jsonl`
+   - **Codex**（若已配置）：扫描 `codex_session_base`（默认 `~/.codex/sessions`）下 `rollout-*.jsonl`，从 `commandExecution.cwd` 提取工作目录
+   
+   逐项询问：
    ```
    📁 扫描到 N 个项目工作目录:
    1. E:\<REDACTED>\<PROJECT_A>-agent
@@ -64,12 +68,21 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
    输入格式：内部术语=对外表述，每行一个，空行结束
    ```
 
-5. **数据源路径**：确认 session 存储路径：
+5. **数据源路径**：确认 Claude session 存储路径：
    ```
    Claude session 存储路径（默认 C:/Users/<当前用户名>/.claude/projects）：
    ```
 
-6. 将所有回答写入 `../../config.yaml`，输出 `✅ 配置已保存到 config.yaml`，继续执行日报生成。
+6. **Codex 数据源**（可选）：询问是否也读取 Codex session：
+   ```
+   是否也配置 Codex session 数据源？（y/n，默认 n）
+   ```
+   若选 y：探测 `~/.codex/sessions`（macOS/Linux）或 `%USERPROFILE%\.codex\sessions`（Windows）是否存在 `rollout-*.jsonl` 文件：
+   - 存在 → `检测到 Codex session 目录: {路径}，使用此路径？(y/n，默认 y)`
+   - 不存在 → `未检测到 Codex session 目录，请手动输入路径（回车跳过）：`
+   结果写入 `data_sources.codex_session_base`，为空则跳过 Codex 数据源。
+
+7. 将所有回答写入 `../../config.yaml`，输出 `✅ 配置已保存到 config.yaml`，继续执行日报生成。
 
 ### 3. 数据采集（两步并行）
 
