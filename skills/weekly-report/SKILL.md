@@ -39,6 +39,8 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
 
 每天：**优先**读 `../../reports/{YYYY-MM}/{YYYY-MM-DD}.md` 解析"今日完成" → **缺失则兜底**执行 session 扫描（同 daily-report 流程，Claude + Codex 双数据源并行采集）。
 
+> Codex 数据源解析规则见 `../../daily-report-rules.md` 第九节：`session_meta.payload.cwd` 取项目归属、`session_meta.payload.timestamp` 取日期、`response_item`(message/function_call/patch_apply_end) 提取内容与产出。Claude 数据源规则见第三节。
+
 > `📊 数据来源: X 天来自日报文件，Y 天来自 session 扫描（含 Claude/Codex）`
 
 ### 4. 聚合分析（六大板块）

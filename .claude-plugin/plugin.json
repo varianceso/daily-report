@@ -2,7 +2,7 @@
   "name": "daily-report",
   "displayName": "日报/周报自动生成",
   "description": "从 Claude/Codex/OpenCode 等 AI 编码助手的 session 记录中自动提取工作内容，结合<CALENDAR_PLATFORM>日程，生成面向团队审阅的标准日报和周报。\n\n功能：\n- 日报：扫描当日 session + git commit，按项目汇总输出\"今日日程 / 今日完成 / 明日计划\"\n- 周报：聚合本周日报，按\"质量异常 / 关键指标 / 重点事项 / 项目进展 / 运维问题 / 下周计划\"输出\n- 智能归并：同项目多轮对话自动合并，拒绝流水账\n- 术语脱敏：自动替换内部术语（AC→交叉验证 等）\n- <CALENDAR_PLATFORM>集成：日报/周报可插入到<CALENDAR_PLATFORM>文档顶部",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "author": {
     "name": "varianceso"
   },

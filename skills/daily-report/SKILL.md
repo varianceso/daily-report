@@ -43,7 +43,7 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
 
 2. **项目配置**：扫描数据源下所有项目的 JSONL/rollout，提取 cwd 去重列表。
    - **Claude**：扫描 `claude_session_base`（默认 `~/.claude/projects` 或 `C:/Users/<用户名>/.claude/projects`）下 `{project_prefix}*/**.jsonl`
-   - **Codex**（若已配置）：扫描 `codex_session_base`（默认 `~/.codex/sessions`）下 `rollout-*.jsonl`，从 `commandExecution.cwd` 提取工作目录
+   - **Codex**（若已配置）：扫描 `codex_session_base`（默认 `~/.codex/sessions`）下 `**/rollout-*.jsonl`，从 `session_meta.payload.cwd`（及 `function_call`(exec_command) 的 `arguments.workdir`）提取工作目录
    
    逐项询问：
    ```
@@ -96,24 +96,29 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
 
 **3c. Codex Session JSONL（当 data_sources.codex_session_base 已配置）：**
 
-扫描 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）下所有 `rollout-*.jsonl` 文件。
-从文件名提取时间戳（格式 `rollout-YYYY-MM-DDTHH-MM-SS-{uuid}.jsonl`），筛选目标日期的文件。
+扫描 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）下 `YYYY/MM/DD/rollout-*.jsonl` 文件，按 `session_meta.payload.timestamp`（ISO，含日期）筛选目标日期；无 session_meta 时回退用文件名时间戳（`rollout-YYYY-MM-DDTHH-MM-SS-{uuid}.jsonl`）。
 
-**Codex JSONL 结构**（与 Claude Code 不同，需独立解析）：
+**Codex JSONL 真实结构**（每行一个顶层事件，含 `timestamp` + `type`，与 Claude Code 不同，需独立解析）：
 
-| Codex ThreadItem `type` | 提取内容 | 用途 |
-|--------------------------|----------|------|
-| `userMessage` | `content` 数组中的 `text` 字段 | 用户任务描述 |
-| `agentMessage` | `text` 字段 | AI 产出内容 |
-| `commandExecution` | `command` + **`cwd`** 字段 | **项目归属** + 实际操作 |
-| `fileChange` | `changes` 数组（文件名 + 状态） | 文件修改记录 |
-| `mcpToolCall` | `server` + `tool` + `arguments` | MCP 工具调用（含日历文档创建/更新） |
+| 顶层 `type` | `payload.type` | 提取字段 | 用途 |
+|-------------|----------------|----------|------|
+| `session_meta` | — | `payload.cwd`、`payload.timestamp` | **项目归属 + 日期** |
+| `response_item` | `message`（role=`user`） | `content[].text` | 用户任务描述 |
+| `response_item` | `message`（role=`assistant`） | `content[].text` | AI 产出内容 |
+| `response_item` | `function_call`（name=`exec_command`） | `arguments.cmd`、`arguments.workdir` | 命令执行 + **细粒度项目归属** |
+| `response_item` | `function_call`（其他 name） | `name`、`arguments` | MCP/自定义工具调用（含日历文档创建/更新） |
+| `response_item` | `patch_apply_end` | patch/changes | 文件修改记录 |
+| `response_item` | `custom_tool_call` | `name`、`arguments` | 自定义工具（含 apply_patch） |
+| `event_msg` | `user_message` / `agent_message` | `message` / `text` | 备用消息来源 |
 
-**关键差异**：
-- 无顶层 `timestamp` 字段 → 用文件名中时间戳判断日期
-- 无顶层 `cwd` 字段 → 从 `commandExecution.cwd` 提取工作目录，归一化（`\`→`/`，小写，去末尾`/`）后匹配 config.yaml projects 映射
-- 无 `type: "user"` / `type: "assistant"` 标记 → 用 `userMessage` / `agentMessage` 区分
-- 行内无 `tool_calls` 计数 → 用 `commandExecution` + `fileChange` + `mcpToolCall` 行数之和作为等效 tool_calls
+> `function_call.arguments` 是 JSON 字符串，需二次 `JSON.parse` 后取 `cmd` / `workdir`。
+
+**关键点**（已修正，勿沿用旧假设）：
+- **有顶层 cwd**：`session_meta.payload.cwd` 即 session 工作目录；`function_call`(exec_command) 的 `arguments.workdir` 提供逐命令细粒度，取出现频率最高者归一化（`\`→`/`，小写，去末尾`/`）后匹配 config.yaml projects 映射
+- **有顶层 timestamp**：`session_meta.payload.timestamp` 直接判断日期，无需依赖文件名
+- 用户/AI 消息：用 `response_item` payload.type=`message` 按 `role` 区分（user/assistant）；`event_msg` 的 `user_message`/`agent_message` 作备用
+- 等效 tool_calls = `function_call` + `custom_tool_call` + `patch_apply_end` 行数之和
+- 忽略 `reasoning`、`token_count`、`compacted`、`turn_context` 等噪音行
 
 **过滤规则**：丢弃等效 tool_calls < 3 或时长 < 5min 的 session（逻辑同步骤 4）。
 
@@ -129,20 +134,20 @@ allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, mcp__<CALENDAR_MCP>__update
 
 1. **识别项目**：cwd 归一化（`\`→`/`，小写，去末尾`/`）后匹配 config.yaml projects 映射
    - **Claude session**：cwd 来自顶层 `cwd` 字段
-   - **Codex session**：cwd 来自 `commandExecution` 行的 `cwd` 字段（取出现频率最高的那个）
+   - **Codex session**：cwd 优先取 `session_meta.payload.cwd`；逐命令细粒度取 `response_item`(function_call, name=exec_command) 的 `arguments.workdir`（取出现频率最高者）
 2. **提取 gitBranch**：从第一条消息的 `gitBranch` 字段获取分支名，**仅供内部判断任务是否合并**。branch 中的数字编号（如 `feature/701-job-management` 的 `701`）**不写入最终日报**——外部读者看不懂工单号，只保留可读的任务描述
    - **Codex session**：无 `gitBranch` 字段，用「项目归属 + 任务关键词」组合替代内部合并判断
 3. **提取任务主题**：
    - **Claude session**：遍历所有 type: "user" 消息，找到 X 条核心任务描述（非链接、非命令、非 tool_result）
-   - **Codex session**：遍历所有 `userMessage` 行的 `content[].text`，提取核心任务描述
+   - **Codex session**：遍历所有 `response_item`(payload.type=message, role=user) 的 `content[].text`，提取核心任务描述
    - **如果第一条消息是<CALENDAR_PLATFORM>链接**：用 `fetch-doc` 获取文档标题作为任务主题标注
    - **任务主题禁止包含分支号**：❌"岗位管理基建（701）" → ✅"岗位管理基建"
    - 示例：链接 `GVYzdsPYdoYO36xx8HNc8x75npH` → 文档标题 "【BRD】岗位管理基建" → 任务主题 "岗位管理基建"
 4. **提取产出**：优先 git commit + tool calls 结果，一句话概括
-   - **Codex session**：等效 tool_calls = `commandExecution` + `fileChange` + `mcpToolCall` 行数之和
+   - **Codex session**：等效 tool_calls = `function_call` + `custom_tool_call` + `patch_apply_end` 行数之和
 5. **⚠️ 提取<CALENDAR_PLATFORM>文档产物**（关键交付物，易遗漏）：
    - **Claude session**：搜索 assistant 消息中 `mcp__<CALENDAR_MCP>__create-doc` 的 tool_use → 获取 `title` 参数
-   - **Codex session**：搜索 `mcpToolCall` 行中 `server` 为 `<CALENDAR_MCP>` 且 `tool` 为 `create-doc` 的记录 → 从 `arguments` 提取 `title`
+   - **Codex session**：搜索 `response_item`(function_call) 行中 `name` 为 `create-doc`（或 mcp 工具全名含 `create-doc`）的记录 → `arguments` 是 JSON 字符串，解析后提取 `title`
    - 搜索对应该 tool_use 的 tool_result → 提取 `doc_url`（<CALENDAR_PLATFORM>文档链接）
    - 搜索 `mcp__<CALENDAR_MCP>__update-doc` 的 tool_use → 提取目标 `doc_id`（更新了哪个文档）
    - 将文档标题 + 链接作为产出附在要点末尾

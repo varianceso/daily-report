@@ -1,6 +1,6 @@
 {
   "name": "daily-report",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "从 Claude/Codex/OpenCode 等 AI 编码助手的 session 记录中自动提取工作内容，结合日历日程，生成面向团队审阅的标准日报和周报。功能：日报（扫描当日 session + git commit，按项目汇总）+ 周报（聚合本周日报，分维度输出）+ 智能归并 + 术语脱敏 + 日历集成。",
   "author": {
     "name": "varianceso",

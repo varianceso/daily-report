@@ -158,48 +158,55 @@
 
 ### 9.1 文件定位
 
-Codex session 以 JSONL 文件存储在 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）目录下，文件名格式为：
+Codex session 以 JSONL 文件存储在 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）目录下，按 `YYYY/MM/DD/` 分层存放，文件名格式为：
 
 ```
 rollout-{YYYY-MM-DDTHH-MM-SS}-{uuid}.jsonl
 ```
 
-例：`rollout-2025-05-07T17-24-21-5973b6c0-94b8-487b-a530-2aeb6098ae0e.jsonl`
+例：`2026/06/04/rollout-2026-06-04T11-02-07-019e9094-...jsonl`
 
-从文件名提取的时间戳（UTC）用于判断日期归属。
+日期归属**优先**取首行 `session_meta.payload.timestamp`（ISO，含日期）；无 session_meta 时回退用文件名时间戳。
 
 ### 9.2 JSONL 行结构
 
-每行是一个 JSON 事件，`type` 字段标识类型。以下是提取日报信息所需的类型映射：
+每行是一个 JSON 事件，含顶层 `timestamp` + `type`，事件体在 `payload`。`type` 取值：`session_meta` / `response_item` / `event_msg` / `turn_context`。提取日报信息所需映射：
 
-| Codex `type` | 提取字段 | 用途 |
-|-------------|----------|------|
-| `userMessage` | `content[].text` | 用户任务描述 |
-| `agentMessage` | `text` | AI 产出摘要 |
-| `commandExecution` | `command`, `cwd`, `status`, `exitCode` | 命令操作 + **cwd 项目归属** |
-| `fileChange` | `changes[].path`, `changes[].status` | 文件修改记录 |
-| `mcpToolCall` | `server`, `tool`, `arguments`, `result` | MCP 工具调用（含日历） |
-| `reasoning` | `summary[]`, `content[]` | AI 推理过程（可忽略） |
-| `webSearch` | `query` | 网络搜索（可忽略） |
+| 顶层 `type` | `payload.type` | 提取字段 | 用途 |
+|-------------|----------------|----------|------|
+| `session_meta` | — | `payload.cwd`、`payload.timestamp`、`payload.id` | **项目归属 + 日期 + session id** |
+| `response_item` | `message`（role=`user`） | `content[].text` | 用户任务描述 |
+| `response_item` | `message`（role=`assistant`） | `content[].text` | AI 产出内容 |
+| `response_item` | `function_call`（name=`exec_command`） | `arguments.cmd`、`arguments.workdir` | 命令执行 + **逐命令项目归属** |
+| `response_item` | `function_call`（其他 name） | `name`、`arguments` | MCP/自定义工具调用（含日历 create-doc/update-doc） |
+| `response_item` | `function_call_output` | `output` | 工具调用结果（对应 `call_id`） |
+| `response_item` | `patch_apply_end` | patch / changes | 文件修改记录（部分版本出现） |
+| `response_item` | `custom_tool_call` / `custom_tool_call_output` | `name`、`arguments` | 自定义工具；**`apply_patch` 是文件修改的主路径** |
+| `event_msg` | `user_message` / `agent_message` | `message` / `text` | 备用消息来源 |
+| `event_msg` | `task_started` / `task_complete` / `turn_aborted` | `started_at` / `completed_at` | 会话时长计算 |
+
+> **注意**：`function_call.arguments` 与 `function_call_output.output` 均为 **JSON 字符串**，需二次 `JSON.parse`。`function_call` 与 `function_call_output` 通过 `call_id` 配对。
+
+**忽略的噪音行**：`reasoning`（加密）、`token_count`、`compacted`、`turn_context`、`web_search_call`（除非需要搜索痕迹）。
 
 ### 9.3 cwd 提取策略
 
-Codex session 无顶层 `cwd` 字段。项目归属通过以下策略确定：
+Codex session **有**顶层 cwd（在 `session_meta.payload.cwd`）。项目归属策略：
 
-1. 收集所有 `commandExecution` 行中非空的 `cwd` 字段
-2. 取出现频率最高的 cwd 作为该 session 的主工作目录
+1. 优先取 `session_meta.payload.cwd` 作为 session 主工作目录
+2. 需逐命令细粒度时，收集 `function_call`(name=exec_command) 的 `arguments.workdir`，取出现频率最高者
 3. 归一化（`\`→`/`，小写，去末尾`/`）后匹配 config.yaml projects 映射
-4. 若全无 `commandExecution` 行（纯对话 session），标记为"无法识别项目"，归入"其他"
+4. 若 session_meta 缺失且无 exec_command 行（纯对话 session），标记为"无法识别项目"，归入"其他"
 
 ### 9.4 等效 tool_calls 计算
 
 Codex 无 `tool_calls` 计数。过滤时计算等效值：
 
 ```
-等效 tool_calls = count(commandExecution) + count(fileChange) + count(mcpToolCall)
+等效 tool_calls = count(function_call) + count(custom_tool_call) + count(patch_apply_end)
 ```
 
-丢弃等效值 < `filter.min_tool_calls` 的 session。
+丢弃等效值 < `filter.min_tool_calls` 的 session。会话时长取首个 `task_started.started_at` 到末个 `task_complete.completed_at`（或 `turn_aborted.completed_at`）的差值。
 
 ### 9.5 gitBranch 缺失处理
 

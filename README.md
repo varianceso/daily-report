@@ -42,37 +42,32 @@
 }
 ```
 
-### Codex / OpenCode / ZCode
-
-同样支持 `/plugin install` 命令（后续适配阶段将实现各自的数据源适配器）。
-
 ### Codex
 
-```bash
-# 添加插件市场
-codex plugin marketplace add https://github.com/varianceso/daily-report.git
+Codex 通过 `~/.codex/config.toml` 注册插件市场与插件（不是 `settings.json`）。在 `config.toml` 中追加：
 
-# 安装插件
-codex plugin add daily-report@daily-report-marketplace
+```toml
+# 1. 注册插件市场
+[marketplaces.daily-report-marketplace]
+source_type = "git"
+source = "https://github.com/varianceso/daily-report.git"
+
+# 2. 启用插件
+[plugins."daily-report@daily-report-marketplace"]
+enabled = true
 ```
 
-或手动配置 `~/.codex/settings.json`：
+> 本地开发可用 `source_type = "local"` + `source = "/绝对路径/daily-report"`。
 
-```json
-{
-  "pluginMarketplaces": [
-    {
-      "source": "git",
-      "url": "https://github.com/varianceso/daily-report.git"
-    }
-  ],
-  "enabledPlugins": {
-    "daily-report@daily-report-marketplace": true
-  }
-}
-```
+启用后重启 Codex，输入 `/` 即可看到本插件提供的斜杠命令（命令来自插件根目录 `commands/*.md`）：
 
-> **注意**：Codex 安装后需在 config.yaml 中配置 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）才能自动读取 Codex session 数据。
+| 命令 | 说明 |
+|------|------|
+| `/daily-report:daily-report` | 生成日报（等价 Claude 侧 `/daily-report`） |
+| `/daily-report:weekly-report` | 生成周报 |
+| `/daily-report:drpt` | 日报短别名 |
+
+> **注意**：需在 `config.yaml` 中配置 `data_sources.codex_session_base`（默认 `~/.codex/sessions`）才能自动读取 Codex session 数据。Codex session 解析规则见 `daily-report-rules.md` 第九节。
 
 ## 初次配置
 
@@ -146,6 +141,8 @@ data_sources:
 
 ## 使用
 
+### Claude Code
+
 ```bash
 # 日报
 /daily-report                          # 今天
@@ -156,6 +153,21 @@ data_sources:
 /weekly-report                         # 本周
 /weekly-report --dr 2026-06-30        # 指定日期所在周
 /weekly-report --w 27                 # 指定周数
+```
+
+### Codex
+
+```bash
+# 日报（命令名 = 插件名:命令文件名）
+/daily-report:daily-report                              # 今天
+/daily-report:daily-report --d 2026-06-30               # 补生成
+/daily-report:daily-report --d 2026-06-30 --fs https://<REDACTED>/docx/xxx
+
+# 周报
+/daily-report:weekly-report --w 27
+
+# 短别名
+/daily-report:drpt
 ```
 
 ### 参数缩写
@@ -187,11 +199,18 @@ data_sources:
 ```
 daily-report/
 ├── .claude-plugin/
-│   ├── plugin.json              # 插件清单
-│   └── marketplace.json         # 插件市场清单
+│   ├── plugin.json              # Claude Code 插件清单
+│   └── marketplace.json         # Claude Code 插件市场清单
+├── .codex-plugin/
+│   └── plugin.json              # Codex 插件清单
+├── commands/                    # Codex 斜杠命令（frontmatter .md）
+│   ├── daily-report.md
+│   ├── weekly-report.md
+│   └── drpt.md
 ├── skills/
-│   ├── daily-report/SKILL.md    # 日报 Skill
-│   └── weekly-report/SKILL.md   # 周报 Skill
+│   ├── daily-report/SKILL.md    # 日报 Skill（Claude/Codex 共用）
+│   ├── weekly-report/SKILL.md   # 周报 Skill
+│   └── drpt/SKILL.md            # 日报短别名
 ├── config.example.yaml           # 配置模板
 ├── daily-report-rules.md         # 处理规则
 └── reports/                      # 输出存档（gitignore）

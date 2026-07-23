@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## v1.2.0 (2026-07-23)
+
+### 修复 — Codex 斜杠命令与 Session 解析
+
+- **新增 Codex 斜杠命令**：新建 `commands/daily-report.md`、`commands/weekly-report.md`、`commands/drpt.md`。此前 `.codex-plugin/plugin.json` 仅有 manifest、无 `commands/` 目录，导致 Codex 输入 `/` 无法唤起 daily-report 命令。命令调用形式 `/daily-report:daily-report` 等，逻辑仍由对应 SKILL.md 承载（Claude/Codex 共用单一事实源）。
+- **修正 Codex session 解析规则**：经采样 `~/.codex/sessions/**/*.jsonl` 验证，原 `daily-report-rules.md` 第九节与 `skills/daily-report/SKILL.md` 步骤 3c 假设的 ThreadItem 类型（`userMessage`/`agentMessage`/`commandExecution`/`fileChange`/`mcpToolCall`）与真实结构不符，会导致提取失败。改为真实结构：
+  - cwd 与日期取自 `session_meta.payload.cwd` / `session_meta.payload.timestamp`（原误以为无顶层 cwd/timestamp）
+  - 用户/AI 消息取自 `response_item` payload.type=`message`（按 role 区分）
+  - 命令执行取自 `response_item` payload.type=`function_call`（name=`exec_command`，`arguments` 含 `cmd`+`workdir`）
+  - 文件修改取自 `patch_apply_end` / `custom_tool_call`
+  - 等效 tool_calls = `function_call` + `custom_tool_call` + `patch_apply_end` 行数之和
+- **修正 README Codex 安装说明**：原误写为 `~/.codex/settings.json` 与 `codex plugin add` 命令，改为真实的 `~/.codex/config.toml` 注册（`[marketplaces.*]` + `[plugins."*@*"]`），并补充 commands 目录与 `/daily-report:*` 调用形式。
+
+### 影响
+
+- **不破坏 Claude 侧**：Claude 走 `.claude-plugin` + skills，新增 `commands/` 不影响；3c 修正仅作用于 Codex 分支。
+- **Codex 侧**：注册插件后 `/` 可唤起命令，session 提取字段准确。
+
+---
+
 ## v1.1.0 (2026-07-22)
 
 ### 新增 — Codex 适配
